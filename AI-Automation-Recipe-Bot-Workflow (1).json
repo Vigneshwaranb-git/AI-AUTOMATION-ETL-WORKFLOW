@@ -1,0 +1,213 @@
+{
+  "name": "AI-Automation-Recipe-Bot-Workflow",
+  "nodes": [
+    {
+      "parameters": {
+        "trigger": [
+          "message"
+        ],
+        "channelId": {
+          "__rl": true,
+          "value": "C0CA1ABLA2Y",
+          "mode": "list",
+          "cachedResultName": "n8n-automation"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.slackTrigger",
+      "typeVersion": 1,
+      "position": [
+        -592,
+        0
+      ],
+      "id": "7818bd32-26cf-4b66-9a3d-392785495346",
+      "name": "Slack Trigger",
+      "webhookId": "0bdaf7e2-fc5f-42a5-ab79-3597e64f5e9a",
+      "credentials": {
+        "slackApi": {
+          "id": "9q54DIrnJcSd28xg",
+          "name": "Slack account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "2f85e662-4fbb-41b8-8cd8-5e9a13e93881",
+              "name": "recipeName",
+              "value": "={{ $json.text }}",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        -336,
+        0
+      ],
+      "id": "e41af663-d987-4f94-b94d-10fca503e40d",
+      "name": "Edit Fields"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=\nGenerate a clear, practical recipe for the following dish:\n\nRecipe name: {{ $('Edit Fields').first().json.recipeName }}\n\nYou are a recipe assistant. Generate a recipe based on the user's request.\n\n**Output rules:**\n1. Return only valid JSON.\n2. Do not include Markdown code fences such as ```json.\n3. Always use the exact JSON structure and field names defined below.\n4. Do not omit any fields. If a value is unavailable, use an appropriate default.\n5. `ingredients` must be a JSON object. Ingredient values should be strings, and ingredient groups may be nested objects.\n6. `instructions` must always be an array of strings.\n7. `cooking_tips` must always be an array of strings. Never use the key `tips`.\n8. `servings` must always be a number, not a string.\n9. Preparation time and cooking time must be strings.\n10. Ensure the output is valid JSON with double quotes around all keys and string values. Do not include trailing commas.\n\n**Required JSON schema:**\n\n{\n  \"recipe_name\": \"Recipe name\",\n  \"preparation_time\": \"30 minutes\",\n  \"cooking_time\": \"45 minutes\",\n  \"servings\": 4,\n  \"ingredients\": {\n    \"ingredient_name\": \"quantity\",\n    \"another_ingredient\": \"quantity\",\n    \"ingredient_group\": {\n      \"sub_ingredient\": \"quantity\"\n    }\n  },\n  \"instructions\": [\n    \"Step 1\",\n    \"Step 2\",\n    \"Step 3\"\n  ],\n  \"cooking_tips\": [\n    \"Tip 1\",\n    \"Tip 2\",\n    \"Tip 3\"\n  ]\n}\n\nGenerate the requested recipe using this exact structure. Replace the example values with the actual recipe details. Do not add extra top-level fields.\nGive me the response in JSON format only",
+        "messages": {
+          "messageValues": []
+        },
+        "batching": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [
+        -144,
+        0
+      ],
+      "id": "ba0afb0f-f032-4053-a764-d997011ff651",
+      "name": "Basic LLM Chain"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "gpt-4.1-mini",
+          "mode": "list",
+          "cachedResultName": "gpt-4.1-mini"
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        -304,
+        224
+      ],
+      "id": "f57494ce-47f9-4745-b5f6-8542e179f1a5",
+      "name": "OpenAI Chat Model",
+      "credentials": {
+        "openAiApi": {
+          "id": "5Uc1rKZSZtfFJNx9",
+          "name": "OpenAI account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst items = $input.all();\n\nreturn items.map(item => {\n  // 1. Get the AI response\n  let rawText = item.json.text || \"\";\n\n  // 2. Remove Markdown code fences if present\n  rawText = rawText\n    .replace(/^```json\\s*/i, \"\")\n    .replace(/^```\\s*/i, \"\")\n    .replace(/\\s*```$/i, \"\")\n    .trim();\n\n  // 3. Parse the JSON response\n  const recipe = JSON.parse(rawText);\n\n  // 4. Format ingredients, including nested objects\n  function formatIngredients(ingredients) {\n    return Object.entries(ingredients || {})\n      .map(([key, value]) => {\n        const name = key\n          .replace(/_/g, \" \")\n          .replace(/\\b\\w/g, char => char.toUpperCase());\n\n        if (value && typeof value === \"object\" && !Array.isArray(value)) {\n          return `\\n*${name}:*\\n${formatIngredients(value)}`;\n        }\n\n        return `• ${name}: ${value}`;\n      })\n      .join(\"\\n\");\n  }\n\n  // 5. Safely get instructions and cooking tips\n  const instructions = Array.isArray(recipe.instructions)\n    ? recipe.instructions\n    : [];\n\n  const tips = Array.isArray(recipe.cooking_tips)\n    ? recipe.cooking_tips\n    : [];\n\n  // 6. Create the Slack message\n  const message = [\n    `🍝 *${recipe.recipe_name || \"Recipe\"}*`,\n    \"\",\n    `⏱️ *Preparation Time:* ${recipe.preparation_time || \"N/A\"}`,\n    `🔥 *Cooking Time:* ${recipe.cooking_time || \"N/A\"}`,\n    `🍽️ *Servings:* ${recipe.servings ?? \"N/A\"}`,\n    \"\",\n    \"🛒 *INGREDIENTS*\",\n    formatIngredients(recipe.ingredients) || \"No ingredients provided\",\n    \"\",\n    \"👨‍🍳 *INSTRUCTIONS*\",\n    ...(instructions.length\n      ? instructions.map((step, index) => `${index + 1}. ${step}`)\n      : [\"No instructions provided\"]),\n    \"\",\n    \"💡 *COOKING TIPS*\",\n    ...(tips.length\n      ? tips.map(tip => `• ${tip}`)\n      : [\"No cooking tips provided\"])\n  ].join(\"\\n\");\n\n  // 7. Return output for the Slack node\n  return {\n    json: {\n      recipe_name: recipe.recipe_name || \"Recipe\",\n      slack_message: message\n    }\n  };\n});\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        224,
+        0
+      ],
+      "id": "9e3dfab7-17b6-4875-9feb-8a8f9edb8e8d",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "={{ $('Edit Fields').item.json.channel }}",
+          "mode": "id"
+        },
+        "text": "={{ $json.slack_message }}",
+        "otherOptions": {}
+      },
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.7,
+      "position": [
+        448,
+        0
+      ],
+      "id": "3695f19c-208e-4ff3-ba70-64c11289e154",
+      "name": "Send a message",
+      "webhookId": "d7af4b50-b4ce-42d4-aec9-a625c163f44c",
+      "credentials": {
+        "slackApi": {
+          "id": "9q54DIrnJcSd28xg",
+          "name": "Slack account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Slack Trigger": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields": {
+      "main": [
+        [
+          {
+            "node": "Basic LLM Chain",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Basic LLM Chain",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Basic LLM Chain": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Send a message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "8ce84aa3-6822-4511-b761-0aafe91f2115",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "e4ba04d377b888c875d2adfa3d256b1635c2eb12b234903f0f6e364529c92666"
+  },
+  "nodeGroups": [],
+  "id": "3nbzVHkIk5UfdV5g",
+  "tags": []
+}

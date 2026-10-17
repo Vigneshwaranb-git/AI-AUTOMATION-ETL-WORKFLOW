@@ -1,0 +1,165 @@
+{
+  "name": "API AI Automation- Customized Email Trigger",
+  "nodes": [
+    {
+      "parameters": {
+        "updates": [
+          "message"
+        ],
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1.5,
+      "position": [
+        -656,
+        -160
+      ],
+      "id": "075d418e-4ef6-4d78-946a-19882b7b273a",
+      "name": "Telegram Trigger",
+      "webhookId": "264617b5-f709-48a4-b7bd-5ce271f065f9",
+      "credentials": {
+        "telegramApi": {
+          "id": "O3U2YpA6E0IhmFQa",
+          "name": "Gen AI Social Eagle bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Create a customized email for the user:\n\ninput: {{ $json.message.text }}\n\nif user is not giving any username or email trigger command\n\nGive the reply gracefully the I don't have much information\n\nGive the ouput as perfect JSON value only\n\nAlways keep my name \"Vigneshwaran Balamurugan\" in the Thanks&Regards\n\nreturn below structure when the required information is available\n{\n  \"to\": \"\",\n  \"username\": \"Manoj\",\n  \"email\": \"manoj@example.com\",\n  \"email_subject\": \"Your customized email\",\n  \"email_body\": \"Hello Manoj, ...\",\n  \"error\": null\n}\n",
+        "batching": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [
+        -144,
+        -160
+      ],
+      "id": "e588753e-de1a-4ebc-bf5d-36adca061e3b",
+      "name": "Basic LLM Chain"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "gpt-4.1-mini",
+          "mode": "list",
+          "cachedResultName": "gpt-4.1-mini"
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        -384,
+        0
+      ],
+      "id": "a7cbc3be-9b5e-41d0-a639-2c0e1a35144f",
+      "name": "OpenAI Chat Model",
+      "credentials": {
+        "openAiApi": {
+          "id": "5Uc1rKZSZtfFJNx9",
+          "name": "OpenAI account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst items = $input.all();\n\nreturn items.map((item) => {\n  let raw = item.json.text ?? item.json.output ?? item.json;\n\n  // Convert object/array input to string if necessary\n  if (typeof raw !== \"string\") {\n    raw = JSON.stringify(raw);\n  }\n\n  // Remove Markdown JSON code fences\n  raw = raw\n    .trim()\n    .replace(/^```(?:json)?\\s*/i, \"\")\n    .replace(/\\s*```$/, \"\")\n    .trim();\n\n  let data;\n\n  try {\n    data = JSON.parse(raw);\n  } catch (error) {\n    data = {\n      error: \"Invalid JSON returned by AI\",\n      details: raw\n    };\n  }\n\n  // Return clean JSON for downstream email integration\n  return {\n    json: data\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        224,
+        -160
+      ],
+      "id": "44ba8e78-ca9f-4f47-92f4-686078d81018",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.email }}",
+        "subject": "={{ $json.email_subject }}",
+        "message": "={{ $json.email_body }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        448,
+        -160
+      ],
+      "id": "25c57397-b7e9-4503-8661-be199a66c9ce",
+      "name": "Send a message",
+      "webhookId": "262e6235-5e2d-4cf1-b41d-9b703b4346a2",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "pY8nHM136uEv5Z23",
+          "name": "theaiceo"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Telegram Trigger": {
+      "main": [
+        [
+          {
+            "node": "Basic LLM Chain",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Basic LLM Chain",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Basic LLM Chain": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Send a message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "0ceb882f-44b2-415d-b6ae-919b1936626e",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "e4ba04d377b888c875d2adfa3d256b1635c2eb12b234903f0f6e364529c92666"
+  },
+  "nodeGroups": [],
+  "id": "J0NzQKMnAqgkiTo6",
+  "tags": []
+}
